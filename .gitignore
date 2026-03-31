@@ -1,0 +1,24 @@
+# Virtual environments
+venv/
+env/
+.env/
+
+# Data and models
+/data/
+/datasets/
+*.pt
+*.pth
+*.ckpt
+
+# Python cache and logs
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.log
+
+# IDE and OS files
+.DS_Store
+.vscode/
+.idea/
