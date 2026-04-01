@@ -34,6 +34,11 @@ class CityscapesDataset(Dataset):
             img = transformed['image']
             mask = transformed['mask']
         else:
+            # Resize PIL images to (256, 256) first to guarantee unified batch sizes
+            from PIL import Image
+            img_pil = img_pil.resize((256, 256), resample=Image.BILINEAR)
+            mask_pil = mask_pil.resize((256, 256), resample=Image.NEAREST)
+
             # Baseline normalization to (C, H, W) in [0.0, 1.0]
             img = TF.to_tensor(img_pil)
             mask = torch.from_numpy(np.array(mask_pil, dtype=np.int64))

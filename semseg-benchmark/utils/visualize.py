@@ -26,18 +26,25 @@ def save_segmentation_maps(images, targets, preds, save_dir, prefix="vis", max_s
         
         target = targets[i].cpu().numpy()
         pred = preds[i].cpu().numpy()
+        
+        # Extract the true unmapped multi-class indices present
+        target_unique = [int(c) for c in np.unique(target) if c != 255]
+        
+        # Prevent ignored edge indices from mathematically stretching the visible colormap
+        target[target == 255] = 0
+        pred[pred == 255] = 0
 
         fig, axes = plt.subplots(1, 3, figsize=(15, 5))
         axes[0].imshow(img)
         axes[0].set_title("Original Image")
         axes[0].axis('off')
 
-        # use a colormap suitable for categorical data visualization
-        axes[1].imshow(target, cmap='nipy_spectral', interpolation='nearest') 
-        axes[1].set_title("Ground Truth Mask")
+        # Use a harsh categorical colormap like 'tab20' so every integer leaps in color hue!
+        axes[1].imshow(target, cmap='tab20', interpolation='nearest', vmin=0, vmax=20) 
+        axes[1].set_title(f"Ground Truth Mask\nIDs: {target_unique}")
         axes[1].axis('off')
 
-        axes[2].imshow(pred, cmap='nipy_spectral', interpolation='nearest')
+        axes[2].imshow(pred, cmap='tab20', interpolation='nearest', vmin=0, vmax=20)
         axes[2].set_title("Predicted Mask")
         axes[2].axis('off')
 

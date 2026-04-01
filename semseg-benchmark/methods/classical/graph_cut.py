@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 from skimage.segmentation import felzenszwalb
+import concurrent.futures
+import os
 
 class GraphCutSegmentation(nn.Module):
     """
@@ -13,21 +15,20 @@ class GraphCutSegmentation(nn.Module):
         self.scale = scale
         self.sigma = sigma
         self.min_size = min_size
+        self.max_workers = os.cpu_count()
+
+    def _process_single(self, img_tensor):
+        img_np = (img_tensor.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
+        segments = felzenszwalb(img_np, scale=self.scale, sigma=self.sigma, min_size=self.min_size)
+        return torch.from_numpy(segments.astype(np.int64))
 
     def forward(self, x):
         """
         x: (B, 3, H, W) normalized to [0,1].
         """
-        B, C, H, W = x.shape
-        masks = []
-        for i in range(B):
-            img = x[i]
-            img_np = (img.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
-            
-            # Predict clusters using felzenszwalb
-            segments = felzenszwalb(img_np, scale=self.scale, sigma=self.sigma, min_size=self.min_size)
-            
-            masks.append(torch.from_numpy(segments.astype(np.int64)))
+        # Execute Scikit-Image bounds on discrete Python background pool threads enabling batching natively
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            masks = list(executor.map(self._process_single, [x[i] for i in range(x.size(0))]))
             
         batch_masks = torch.stack(masks).to(x.device)
         return batch_masks

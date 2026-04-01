@@ -12,14 +12,17 @@ class VOCDataset(Dataset):
     def __init__(self, root, split='train', transforms=None):
         self.root = root
         
+        # Check if downloaded to avoid massive 2GB MD5 checksum delays on evaluation launches
+        import os
+        is_downloaded = os.path.exists(os.path.join(self.root, 'VOCdevkit'))
+
         # VOC splits are 'train', 'val', or 'trainval'.
         # For evaluation, 'val' is standard. We map 'val' to 'val'.
-        # Note: VOC requires download=True for automatic setup.
         self.voc_ds = VOCSegmentation(
             root=self.root, 
             year='2012', 
             image_set=split, 
-            download=True
+            download=not is_downloaded
         )
         self.transforms = transforms
 
@@ -38,6 +41,11 @@ class VOCDataset(Dataset):
             img = transformed['image']
             mask = transformed['mask']
         else:
+            # Resize PIL images to (256, 256) first to guarantee unified batch sizes
+            from PIL import Image
+            img_pil = img_pil.resize((256, 256), resample=Image.BILINEAR)
+            mask_pil = mask_pil.resize((256, 256), resample=Image.NEAREST)
+
             # Baseline normalization to (C, H, W) in [0.0, 1.0]
             img = TF.to_tensor(img_pil)
             mask = torch.from_numpy(np.array(mask_pil, dtype=np.int64))
