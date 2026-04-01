@@ -16,26 +16,48 @@ pip install -r requirements.txt
 We currently support running semantic segmentation evaluation on **Pascal VOC** (Automatic Download) and **COCO-Stuff**. 
 By default, multi-class semantic masks are binarized against the foreground dynamically to compare against standard foreground-background Global/Otsu threshold predictions.
 
-### Execute Threshold Segmentation (Pascal VOC Default)
+### Base Execution Command 
 
-You can run the evaluation via the `run.py` wrapper, which dynamically maps the models to the dataset and computes **mIoU** and **Pixel Accuracy**. 
-**If you don't have Pascal VOC installed, it will automatically download the 2GB dataset into the `./data` folder in your project!**
+The benchmark evaluation is executed logically through the `run.py` wrapper, which dynamically pipelines deep learning and classical models seamlessly across supported multi-class datasets (computing **mIoU** and **Pixel Accuracy** natively). 
 
+> **Tip:** If you initiate `voc` without having Pascal VOC installed previously, it will automatically download (~2GB) and unpack it right into your root `./data` folder!
+
+Here is the universal base command template:
 ```bash
-# 🔥 Auto-Download VOC & Run Otsu's optimal threshold (Default) on the Validation split
-python semseg-benchmark/run.py --dataset voc --split val --method otsu
-
-# Run a hardcoded Global threshold of 127
-python semseg-benchmark/run.py --dataset voc --split val --method global --global-thresh 127
-
-# Switch mapping to evaluate the original unzipped COCO datasets
-python semseg-benchmark/run.py --dataset coco --data-root /path/to/extracted/coco-stuff --split val 
+python semseg-benchmark/run.py --dataset [DATASET] --method [METHOD] --batch-size [SIZE] --visualize
 ```
 
-**Custom Argument Flags:**
-- `--dataset`: Switches between automatic downloading `voc` (default) or hard filesystem `coco`.
-- `--data-root`: (Optional) Custom output directory for the VOC Download, or strict required string folder for `coco`.
-- `--split`: Evaluates over the `val` (default) or `train` datasets.
-- `--method`: Chooses the threshold strategy (`otsu` or `global`).
-- `--global-thresh`: Overrides the integer cutoff if `--method global`.
-- `--batch-size`: Set a PyTorch batch size (default is `1`).
+### Argument Glossary & Method Mappings
+
+You can infinitely combine these tracking parameters to shape your benchmark test:
+
+#### 1. Dataset Selection (`--dataset`)
+- `voc`: *(Default)* Pascal VOC 2012. Auto-downloads and parses 21 classes natively.
+- `coco`: COCO-Stuff dataset. Evaluates across 182 semantic categories. Requires `--data-root` to point to an extracted dataset.
+- `cityscapes`: High-resolution street datasets parsing 19 semantic road classes natively. Requires `--data-root`.
+
+#### 2. Segmentation Methods (`--method`)
+Each string exactly maps to a distinct initialization class.
+- **Binary Image Segmentation:** (Calculates Binary metrics only)
+  - `otsu`: Automatically determines a unified foreground threshold using `cv2.THRESH_OTSU`.
+  - `global`: Enforces a hardcoded pixel limit cut-off (controlled by `--global-thresh <INT>`). 
+  - `edge`: Runs morphological tracking and explicit `cv2.Canny` abstractions to boundary edge maps.
+
+- **Unsupervised / Multi-Class Clustering:** (Leverages `Majority Voting` to match generated unsupervised clusters against Target Semantic Maps)
+  - `graph_cut`: Instantiates Felzenszwalb's efficient graph abstraction algorithm.
+  - `region`: Instantiates SLIC Superpixel spatial boundary mappings.
+  - `kmeans`: Recursively clusters explicit arbitrary RGB regions evaluating Scikit-Learn's `MiniBatchKMeans`.
+
+#### 3. Core Benchmark Toggles
+- `--batch-size`: Set explicit parallel processing count (default `1`). *(Note: Datasets natively interpolate down to 256x256 under the hood to safely support Bounding Parallel Batches.)*
+- `--split`: Evaluates directly over the `val` (default) or `train` datasets.
+- `--data-root`: Override default string root for Dataset installations (`./data/`).
+- `--global-thresh`: Overrides the threshold integer parameter cutoff (if passing `--method global`).
+
+#### 4. Qualitative Visualization Mode
+Appending the `--visualize` flag safely captures the eval arrays and visually plots the **Original Image**, the **Ground Truth Array**, and the **Algorithm Prediction Mapping** side-by-side!
+- `--vis-count`: Set the maximum number of iterations you want plotted before logic bypasses visualization entirely (Default bounds to `10` outputs).
+- `--vis-seed`: Define an explicit integer seed (Default `42`) establishing deterministic bounds so the randomized captured targets uniformly overlap precisely the same geometric validations natively every run!
+- `--vis-complex`: Automatically injects an isolated bounding scan across the raw dataset prior to sequence tracking! It inherently discovers unblemished images intrinsically possessing 4 or more semantic classes (Background + >=3 Targets), saving their index parameters securely over to a native cache `.npy` format ensuring all sequential `--vis-seed` outputs natively reflect fundamentally complex Multi-Class optical arrays!
+
+Outputs systematically organize natively into cleanly labelled folder matrices (e.g., `./results/voc_kmeans/vis_3.png`) within your project root.

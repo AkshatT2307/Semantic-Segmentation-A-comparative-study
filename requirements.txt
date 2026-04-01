@@ -3,3 +3,6 @@ torchvision
 opencv-python
 numpy
 tqdm
+scikit-image
+scikit-learn
+matplotlib

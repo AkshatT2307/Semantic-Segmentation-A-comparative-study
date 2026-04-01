@@ -43,6 +43,10 @@ class CocoStuffDataset(Dataset):
             mask = transformed['mask']
         else:
             # Baseline default scaling and normalization to standard PyTorch tensor shapes
+            # Resize via cv2
+            img = cv2.resize(img, (256, 256), interpolation=cv2.INTER_LINEAR)
+            mask = cv2.resize(mask, (256, 256), interpolation=cv2.INTER_NEAREST)
+
             img = torch.from_numpy(img.transpose(2, 0, 1)).float() / 255.0
             mask = torch.from_numpy(mask).long()
 

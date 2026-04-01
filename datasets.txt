@@ -1,0 +1,12 @@
+General purpose segmentation:
+COCO-stuff
+Pascal Voc 2012
+
+Autonomous Driving: 
+Cityscapes
+BDD 100k
+
+Medical Image segmentation:
+BraTS (3-classes)
+https://drive.google.com/drive/folders/1HqEgzS8BV2c7xYNrZdEAnrHk7osJJ--2
+
