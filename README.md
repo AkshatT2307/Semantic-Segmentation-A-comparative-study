@@ -16,7 +16,7 @@ pip install -r requirements.txt
 We currently support running semantic segmentation evaluation on **Pascal VOC** (Automatic Download) and **COCO-Stuff**. 
 By default, multi-class semantic masks are binarized against the foreground dynamically to compare against standard foreground-background Global/Otsu threshold predictions.
 
-### Execute Threshold Segmentation (Pascal VOC Default)
+### Execute Classical Methods & Visualization
 
 You can run the evaluation via the `run.py` wrapper, which dynamically maps the models to the dataset and computes **mIoU** and **Pixel Accuracy**. 
 **If you don't have Pascal VOC installed, it will automatically download the 2GB dataset into the `./data` folder in your project!**
@@ -28,14 +28,25 @@ python semseg-benchmark/run.py --dataset voc --split val --method otsu
 # Run a hardcoded Global threshold of 127
 python semseg-benchmark/run.py --dataset voc --split val --method global --global-thresh 127
 
-# Switch mapping to evaluate the original unzipped COCO datasets
-python semseg-benchmark/run.py --dataset coco --data-root /path/to/extracted/coco-stuff --split val 
+# Evaluate Graph-Cut with Visualization enabled
+python semseg-benchmark/run.py --dataset voc --method graph_cut --visualize --vis-count 10
+
+# Evaluate KMeans using Cityscapes 
+python semseg-benchmark/run.py --dataset cityscapes --method kmeans --visualize
+
+# Evaluate SLIC-based Region mapping on COCO
+python semseg-benchmark/run.py --dataset coco --method region --visualize --vis-count 5
+
+# Evaluate Canny Edge Segmentation
+python semseg-benchmark/run.py --dataset voc --method edge --visualize
 ```
 
 **Custom Argument Flags:**
-- `--dataset`: Switches between automatic downloading `voc` (default) or hard filesystem `coco`.
-- `--data-root`: (Optional) Custom output directory for the VOC Download, or strict required string folder for `coco`.
+- `--dataset`: `voc` (default auto-download), `coco`, or `cityscapes`.
+- `--data-root`: Base directory for datasets (default `./data`).
 - `--split`: Evaluates over the `val` (default) or `train` datasets.
-- `--method`: Chooses the threshold strategy (`otsu` or `global`).
+- `--method`: Algorithm to use: `otsu`, `global`, `graph_cut`, `region`, `kmeans`, or `edge`.
 - `--global-thresh`: Overrides the integer cutoff if `--method global`.
 - `--batch-size`: Set a PyTorch batch size (default is `1`).
+- `--visualize`: Generates qualitative visualization grids mapping to `./results/`.
+- `--vis-count`: Max samples to visually process per run (default `10`).

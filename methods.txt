@@ -1,0 +1,14 @@
+Model / Techniques
+
+● Edge Detection–based Segmentation
+
+● Threshold-based Segmentation
+
+● Region-based Segmentation
+
+● Feature-based Clustering (K-Means, etc.)
+
+● Machine Learning–based Segmentation
+
+● Deep Learning–based Segmentation (CNN / Mask R-CNN)
+
