@@ -292,3 +292,53 @@ class RTDETRDetectionLoss(DETRLoss):
             else:
                 dn_match_indices.append((torch.zeros([0], dtype=torch.int32), torch.zeros([0], dtype=torch.int32)))
         return dn_match_indices
+
+class BCELoss2d(nn.Module):
+    
+    def __init__(self):
+        super(BCELoss2d, self).__init__()
+        self.bce_loss = nn.BCELoss()
+    
+    def forward(self, predict, target):
+        predict = predict.view(-1)
+        target = target.view(-1)
+        return self.bce_loss(predict, target)
+
+def dice_coeff(predict, target):
+    smooth = 0.001
+    batch_size = predict.size(0)
+    predict = (predict > 0.5).float()
+    m1 = predict.view(batch_size, -1)
+    m2 = target.view(batch_size, -1)
+    intersection = (m1 * m2).sum(-1)
+    return ((2.0 * intersection + smooth) / (m1.sum(-1) + m2.sum(-1) + smooth)).mean()
+
+class CrossEntropyDiceLoss(nn.Module):
+    def __init__(self, ignore_index=255, ce_weight=1.0, dice_weight=1.0):
+        super(CrossEntropyDiceLoss, self).__init__()
+        self.ignore_index = ignore_index
+        self.ce_weight = ce_weight
+        self.dice_weight = dice_weight
+        self.cross_entropy = nn.CrossEntropyLoss(ignore_index=ignore_index)
+        
+    def forward(self, predict, target):
+        ce_loss = self.cross_entropy(predict, target)
+        
+        probs = F.softmax(predict, dim=1) # (B, C, H, W)
+        
+        valid_mask = target != self.ignore_index
+        target = target * valid_mask.long()
+        
+        target_one_hot = F.one_hot(target, num_classes=predict.size(1)).permute(0, 3, 1, 2).float() # (B, C, H, W)
+        
+        valid_mask = valid_mask.unsqueeze(1).float() # (B, 1, H, W)
+        probs = probs * valid_mask
+        target_one_hot = target_one_hot * valid_mask
+        
+        intersection = (probs * target_one_hot).sum(dim=(2, 3))
+        union = probs.sum(dim=(2, 3)) + target_one_hot.sum(dim=(2, 3))
+        
+        dice_score = (2. * intersection + 1e-5) / (union + 1e-5)
+        dice_loss = 1. - dice_score.mean()
+        
+        return self.ce_weight * ce_loss + self.dice_weight * dice_loss

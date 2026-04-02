@@ -13,7 +13,7 @@ pip install -r requirements.txt
 
 ## Running Evaluation Benchmarks
 
-We currently support running semantic segmentation evaluation on **Pascal VOC** (Automatic Download) and **COCO-Stuff**. 
+We currently support running semV`antic segmentation evaluation on **Pascal VOC** (Automatic Download) and **COCO-Stuff**. 
 By default, multi-class semantic masks are binarized against the foreground dynamically to compare against standard foreground-background Global/Otsu threshold predictions.
 
 ### Base Execution Command 

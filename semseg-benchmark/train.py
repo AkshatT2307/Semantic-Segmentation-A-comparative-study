@@ -1,0 +1,140 @@
+import argparse
+import os
+import sys
+
+# Add methods/deep to sys.path to resolve 'ultralytics' imports
+sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), 'methods/deep'))
+
+import yaml
+import torch
+import torch.nn as nn
+from tqdm import tqdm
+import logging
+from torch.utils.data import DataLoader
+
+from methods.deep.unet import UNet
+from training.losses import CrossEntropyDiceLoss
+from evaluation.iou import compute_iou
+from data.loaders.coco import CocoStuffDataset
+from data.loaders.cityscapes import CityscapesDataset
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+
+def get_args():
+    parser = argparse.ArgumentParser(description="Evaluate and Train deep segmentation algorithms.")
+    parser.add_argument("--model", type=str, default="unet", choices=["unet", "segformer", "segnet"], help="Select model to train.")
+    parser.add_argument("--encoder", type=str, default="resnet34", help="Encoder backbone for the model (e.g. resnet34, resnet50, efficientnet-b4). Pretrained ImageNet weights are downloaded automatically.")
+    parser.add_argument("--dataset", type=str, default="cityscapes", choices=["coco", "cityscapes"], help="Select Dataset wrapper.")
+    parser.add_argument("--data-root", type=str, default="./data", help="Path to dataset root directory (Default: ./data).")
+    parser.add_argument("--config", type=str, default="configs/train_config.yaml", help="Path to config file.")
+    parser.add_argument("--batch-size", type=int, default=16, help="Training batch size.")
+    parser.add_argument("--epochs", type=int, default=100, help="Number of epochs.")
+    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu", help="Device to train on.")
+    
+    return parser.parse_args()
+
+def train(model, train_loader, val_loader, criterion, optimizer, args, num_classes):
+    device = torch.device(args.device)
+    model = model.to(device)
+    
+    best_miou = 0.0
+    for epoch in range(args.epochs):
+        model.train()
+        train_loss = 0.0
+        n_total = 0
+        
+        logging.info(f"Epoch {epoch+1}/{args.epochs}")
+        for batch in tqdm(train_loader, desc="Training"):
+            inputs, target = batch['img'].to(device), batch['mask'].to(device)
+            predict = model(inputs)
+            
+            optimizer.zero_grad()
+            loss = criterion(predict, target)
+            loss.backward()
+            optimizer.step()
+            
+            train_loss += loss.item() * inputs.size(0)
+            n_total += inputs.size(0)
+            
+        train_loss /= n_total
+        
+        model.eval()
+        val_loss, total_iou, num_samples = 0.0, 0.0, 0
+        with torch.no_grad():
+            for batch in tqdm(val_loader, desc="Validation"):
+                inputs, target = batch['img'].to(device), batch['mask'].to(device)
+                predict = model(inputs)
+                loss = criterion(predict, target)
+                
+                pred_class = predict.argmax(dim=1)
+                
+                _, miou = compute_iou(pred_class, target, num_classes=num_classes, ignore_index=255)
+                
+                val_loss += loss.item() * inputs.size(0)
+                if not torch.isnan(miou):
+                    total_iou += miou.item() * inputs.size(0)
+                    num_samples += inputs.size(0)
+                
+        val_loss /= len(val_loader.dataset)
+        val_miou = total_iou / num_samples if num_samples > 0 else 0.0
+        
+        logging.info(f"Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Val mIoU: {val_miou:.4f}")
+        
+        if val_miou > best_miou:
+            best_miou = val_miou
+            os.makedirs("weights", exist_ok=True)
+            torch.save(model.state_dict(), f"weights/{args.model}_best.pt")
+            logging.info(f"Saved best model with mIoU: {best_miou:.4f}")
+
+def main():
+    args = get_args()
+    
+    with open(args.config, "r") as f:
+        config = yaml.safe_load(f)
+        
+    logging.info(f"Loading {args.dataset} dataset from {args.data_root}...")
+    
+    if args.dataset == 'coco':
+        trainset = CocoStuffDataset(root=args.data_root, split='train')
+        valset = CocoStuffDataset(root=args.data_root, split='val')
+        num_classes = 171 # COCO-Stuff typically has 171
+    elif args.dataset == 'cityscapes':
+        trainset = CityscapesDataset(root=args.data_root, split='train')
+        valset = CityscapesDataset(root=args.data_root, split='val')
+        num_classes = 19
+    else:
+        raise ValueError(f"Unknown dataset: {args.dataset}")
+    
+    train_loader = DataLoader(dataset=trainset, batch_size=args.batch_size, shuffle=True)
+    val_loader = DataLoader(dataset=valset, batch_size=args.batch_size, shuffle=False)
+        
+    logging.info(f"Initializing {args.model} (encoder={args.encoder}, pretrained=imagenet) for {num_classes} classes...")
+    if args.model == "unet":
+        model = UNet(n_channels=3, n_classes=num_classes, encoder_name=args.encoder, encoder_weights='imagenet')
+    elif args.model == "segformer":
+        raise NotImplementedError("SegFormer model not yet implemented.")
+    elif args.model == "segnet":
+        raise NotImplementedError("SegNet model not yet implemented.")
+    else:
+        raise ValueError(f"Unknown model: {args.model}")
+        
+    train_cfg = config.get("training", {})
+    
+    criterion = CrossEntropyDiceLoss(ignore_index=255)
+    optimizer = torch.optim.Adam(
+        filter(lambda p: p.requires_grad, model.parameters()), 
+        lr=train_cfg.get("lr", 1e-3), 
+        weight_decay=train_cfg.get("l2reg", 1e-5)
+    )
+    
+    logging.info(f"Starting training on {args.device} for {args.epochs} epochs...")
+    train(model, train_loader, val_loader, criterion, optimizer, args, num_classes)
+
+if __name__ == "__main__":
+    main()

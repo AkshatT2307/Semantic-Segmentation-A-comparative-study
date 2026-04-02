@@ -17,13 +17,14 @@ logging.basicConfig(
 )
 
 from data.loaders.coco import CocoStuffDataset
-from data.loaders.voc import VOCDataset
 from data.loaders.cityscapes import CityscapesDataset
 from methods.classical.threshold import ThresholdSegmentation
 from methods.classical.graph_cut import GraphCutSegmentation
 from methods.classical.region import RegionSegmentation
 from methods.classical.edge import EdgeSegmentation
 from methods.ml.kmeans import KMeansSegmentation
+from methods.ml.gmm import GMMSegmentation
+from methods.ml.svm import SVMSegmentation
 from utils.visualize import save_segmentation_maps
 from evaluation.iou import compute_iou
 from evaluation.pixel_acc import compute_pixel_accuracy
@@ -31,11 +32,11 @@ from evaluation.mappings import map_clusters_to_classes
 
 def get_args():
     parser = argparse.ArgumentParser(description="Evaluate threshold segmentation algorithms.")
-    parser.add_argument("--dataset", type=str, default="voc", choices=["coco", "voc", "cityscapes"], help="Select Dataset wrapper.")
+    parser.add_argument("--dataset", type=str, default="cityscapes", choices=["coco", "cityscapes"], help="Select Dataset wrapper.")
     parser.add_argument("--data-root", type=str, default="./data", help="Path to dataset root directory (Default: ./data).")
     parser.add_argument("--split", type=str, default="val", choices=["train", "val"], help="Dataset split to evaluate on.")
     parser.add_argument("--batch-size", type=int, default=1, help="Evaluation batch size.")
-    parser.add_argument("--method", type=str, default="otsu", choices=["otsu", "global", "graph_cut", "region", "kmeans", "edge"], help="Segmentation method.")
+    parser.add_argument("--method", type=str, default="otsu", choices=["otsu", "global", "graph_cut", "region", "kmeans", "edge", "gmm", "svm"], help="Segmentation method.")
     parser.add_argument("--global-thresh", type=int, default=127, help="Global threshold value (used iff method=global).")
     parser.add_argument("--visualize", action="store_true", help="Save visualization maps.")
     parser.add_argument("--vis-count", type=int, default=10, help="Number of random samples to visualize.")
@@ -55,9 +56,7 @@ def main():
             logging.error(f"Dataset directory {args.data_root} doesn't exist.")
             return
         dataset = CocoStuffDataset(root=args.data_root, split=args.split)
-    elif args.dataset == 'voc':
-        logging.info(f"Initializing Pascal VOC loader inside {args.data_root} ...")
-        dataset = VOCDataset(root=args.data_root, split=args.split)
+
     elif args.dataset == 'cityscapes':
         logging.info(f"Initializing Cityscapes loader inside {args.data_root} ...")
         dataset = CityscapesDataset(root=args.data_root, split=args.split)
@@ -77,6 +76,10 @@ def main():
         model = RegionSegmentation().to(device)
     elif args.method == 'kmeans':
         model = KMeansSegmentation().to(device)
+    elif args.method == 'gmm':
+        model = GMMSegmentation().to(device)
+    elif args.method == 'svm':
+        model = SVMSegmentation().to(device)
     elif args.method == 'edge':
         model = EdgeSegmentation().to(device)
 
@@ -128,7 +131,7 @@ def main():
                 target_eval[target == 255] = 255
                 pred_eval = pred
                 eval_classes = 2
-            elif args.method in ['graph_cut', 'region', 'kmeans']:
+            elif args.method in ['graph_cut', 'region', 'kmeans', 'gmm', 'svm']:
                 # Keep multi-class and dynamically map clusters to semantic classes
                 target_eval = target
                 pred_eval = map_clusters_to_classes(pred, target, ignore_index=255)
