@@ -18,6 +18,7 @@ logging.basicConfig(
 
 from data.loaders.coco import CocoStuffDataset
 from data.loaders.cityscapes import CityscapesDataset
+from data.loaders.aerial import AerialDataset
 from methods.classical.threshold import ThresholdSegmentation
 from methods.classical.graph_cut import GraphCutSegmentation
 from methods.classical.region import RegionSegmentation
@@ -32,7 +33,7 @@ from evaluation.mappings import map_clusters_to_classes
 
 def get_args():
     parser = argparse.ArgumentParser(description="Evaluate threshold segmentation algorithms.")
-    parser.add_argument("--dataset", type=str, default="cityscapes", choices=["coco", "cityscapes"], help="Select Dataset wrapper.")
+    parser.add_argument("--dataset", type=str, default="cityscapes", choices=["coco", "cityscapes", "aerial"], help="Select Dataset wrapper.")
     parser.add_argument("--data-root", type=str, default="./data", help="Path to dataset root directory (Default: ./data).")
     parser.add_argument("--split", type=str, default="val", choices=["train", "val"], help="Dataset split to evaluate on.")
     parser.add_argument("--batch-size", type=int, default=1, help="Evaluation batch size.")
@@ -61,6 +62,10 @@ def main():
         logging.info(f"Initializing Cityscapes loader inside {args.data_root} ...")
         dataset = CityscapesDataset(root=args.data_root, split=args.split)
         
+    elif args.dataset == 'aerial':
+        logging.info(f"Initializing Aerial loader inside {args.data_root} ...")
+        dataset = AerialDataset(root=args.data_root, split=args.split)
+        
     if len(dataset) == 0:
         logging.error("Dataset empty. Check your data root path.")
         return
@@ -82,7 +87,7 @@ def main():
         model = SVMSegmentation().to(device)
     elif args.method == 'edge':
         model = EdgeSegmentation().to(device)
-
+    
     vis_target_indices = set()
     if args.visualize:
         random.seed(args.vis_seed)

@@ -1,106 +1,42 @@
-# Ultralytics YOLO 🚀, AGPL-3.0 license
 """
-FastSAM model interface.
+SegFormer wrapper using segmentation_models_pytorch (SMP).
 
-Usage - Predict:
-    from ultralytics import FastSAM
-
-    model = FastSAM('last.pt')
-    results = model.predict('ultralytics/assets/bus.jpg')
+Transfer learning strategy:
+  - Encoder (ResNet34 by default) is loaded with ImageNet pretrained weights.
+  - Decoder and segmentation head are randomly initialised and fine-tuned.
+  - A different encoder can be chosen via the `encoder_name` argument.
+  - Pass freeze_encoder=True to freeze encoder weights so only the decoder and segmentation head are trained.
 """
-
-from ultralytics.yolo.cfg import get_cfg
-from ultralytics.yolo.engine.exporter import Exporter
-from ultralytics.yolo.engine.model import YOLO
-from ultralytics.yolo.utils import DEFAULT_CFG, LOGGER, ROOT, is_git_dir
-from ultralytics.yolo.utils.checks import check_imgsz
-
-from ultralytics.yolo.utils.torch_utils import model_info, smart_inference_mode
-from .predict import FastSAMPredictor
+import segmentation_models_pytorch as smp
 
 
-class FastSAM(YOLO):
+def SegFormer(n_channels: int = 3,
+              n_classes: int = 19,
+              pretrained_path: str = None,   # kept for API compatibility
+              freeze_encoder: bool = True,
+              encoder_name: str = 'resnet34',
+              encoder_weights: str = 'imagenet'):
+    """
+    Return an SMP Segformer with a pretrained encoder, ready for fine-tuning.
 
-    @smart_inference_mode()
-    def predict(self, source=None, stream=False, **kwargs):
-        """
-        Perform prediction using the YOLO model.
+    Args:
+        n_channels:      Number of input image channels (default 3 for RGB).
+        n_classes:       Number of output segmentation classes.
+        pretrained_path: Ignored (kept for backward compatibility).
+        freeze_encoder:  If True (default), freeze encoder weights so only the
+                         decoder and segmentation head are trained.
+        encoder_name:    Encoder backbone, e.g. 'resnet34', 'resnet50'.
+        encoder_weights: Pretrained weights source, e.g. 'imagenet'.
+    """
+    model = smp.Segformer(
+        encoder_name=encoder_name,
+        encoder_weights=encoder_weights,
+        in_channels=n_channels,
+        classes=n_classes,
+    )
 
-        Args:
-            source (str | int | PIL | np.ndarray): The source of the image to make predictions on.
-                          Accepts all source types accepted by the YOLO model.
-            stream (bool): Whether to stream the predictions or not. Defaults to False.
-            **kwargs : Additional keyword arguments passed to the predictor.
-                       Check the 'configuration' section in the documentation for all available options.
+    # Freeze / unfreeze encoder
+    for param in model.encoder.parameters():
+        param.requires_grad = not freeze_encoder
 
-        Returns:
-            (List[ultralytics.yolo.engine.results.Results]): The prediction results.
-        """
-        if source is None:
-            source = ROOT / 'assets' if is_git_dir() else 'https://ultralytics.com/images/bus.jpg'
-            LOGGER.warning(f"WARNING ⚠️ 'source' is missing. Using 'source={source}'.")
-        overrides = self.overrides.copy()
-        overrides['conf'] = 0.25
-        overrides.update(kwargs)  # prefer kwargs
-        overrides['mode'] = kwargs.get('mode', 'predict')
-        assert overrides['mode'] in ['track', 'predict']
-        overrides['save'] = kwargs.get('save', False)  # do not save by default if called in Python
-        self.predictor = FastSAMPredictor(overrides=overrides)
-        self.predictor.setup_model(model=self.model, verbose=False)
-        try:
-            return self.predictor(source, stream=stream)
-        except Exception as e:
-            return None
-
-    def train(self, **kwargs):
-        """Function trains models but raises an error as FastSAM models do not support training."""
-        raise NotImplementedError("Currently, the training codes are on the way.")
-
-    def val(self, **kwargs):
-        """Run validation given dataset."""
-        overrides = dict(task='segment', mode='val')
-        overrides.update(kwargs)  # prefer kwargs
-        args = get_cfg(cfg=DEFAULT_CFG, overrides=overrides)
-        args.imgsz = check_imgsz(args.imgsz, max_dim=1)
-        validator = FastSAM(args=args)
-        validator(model=self.model)
-        self.metrics = validator.metrics
-        return validator.metrics
-
-    @smart_inference_mode()
-    def export(self, **kwargs):
-        """
-        Export model.
-
-        Args:
-            **kwargs : Any other args accepted by the predictors. To see all args check 'configuration' section in docs
-        """
-        overrides = dict(task='detect')
-        overrides.update(kwargs)
-        overrides['mode'] = 'export'
-        args = get_cfg(cfg=DEFAULT_CFG, overrides=overrides)
-        args.task = self.task
-        if args.imgsz == DEFAULT_CFG.imgsz:
-            args.imgsz = self.model.args['imgsz']  # use trained imgsz unless custom value is passed
-        if args.batch == DEFAULT_CFG.batch:
-            args.batch = 1  # default to 1 if not modified
-        return Exporter(overrides=args)(model=self.model)
-
-    def info(self, detailed=False, verbose=True):
-        """
-        Logs model info.
-
-        Args:
-            detailed (bool): Show detailed information about model.
-            verbose (bool): Controls verbosity.
-        """
-        return model_info(self.model, detailed=detailed, verbose=verbose, imgsz=640)
-
-    def __call__(self, source=None, stream=False, **kwargs):
-        """Calls the 'predict' function with given arguments to perform object detection."""
-        return self.predict(source, stream, **kwargs)
-
-    def __getattr__(self, attr):
-        """Raises error if object has no requested attribute."""
-        name = self.__class__.__name__
-        raise AttributeError(f"'{name}' object has no attribute '{attr}'. See valid attributes below.\n{self.__doc__}")
+    return model

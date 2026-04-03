@@ -6,6 +6,8 @@ env/
 # Data and models
 /data/
 /datasets/
+binary_dataset/
+classes_dataset/
 *.pt
 *.pth
 *.ckpt
