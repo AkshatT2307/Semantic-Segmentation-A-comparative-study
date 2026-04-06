@@ -69,8 +69,11 @@ class CityscapesDataset(Dataset):
             img_pil = img_pil.resize((256, 256), resample=Image.BILINEAR)
             mask_pil = mask_pil.resize((256, 256), resample=Image.NEAREST)
 
-            # Baseline normalization to (C, H, W) in [0.0, 1.0]
-            img = TF.to_tensor(img_pil)
+            # # Baseline normalization to (C, H, W) in [0.0, 1.0]
+            # img = TF.to_tensor(img_pil) --> not good for image net
+            # Image Net normalization expected by pre-trained resnet-34 encoder
+            img = TF.normalize(img, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
             mask = torch.from_numpy(np.array(mask_pil, dtype=np.int64))
 
         return {'img': img, 'mask': mask, 'img_path': f"cityscapes_{idx}"}

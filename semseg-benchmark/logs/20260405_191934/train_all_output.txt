@@ -1,0 +1,74 @@
+========================================
+  semseg-benchmark — Train All
+  Started: Sun Apr  5 07:19:34 PM UTC 2026
+  Logs:    logs/20260405_191934/
+  Master:  logs/20260405_191934/train_all_output.txt
+========================================
+
+>>> [0/6] Running validation suite...
+============================================================
+  semseg-benchmark — Full Validation Suite
+============================================================
+
+═══ Classical Methods ═══
+  [92m✓ PASS[0m  Otsu Threshold — forward — output torch.Size([2, 64, 64])
+  [92m✓ PASS[0m  Global Threshold — forward — output torch.Size([2, 64, 64])
+  [92m✓ PASS[0m  Graph Cut — forward — output torch.Size([2, 64, 64])
+  [92m✓ PASS[0m  Region (SLIC) — forward — output torch.Size([2, 64, 64])
+  [92m✓ PASS[0m  Edge (Canny) — forward — output torch.Size([2, 64, 64])
+
+═══ ML Methods ═══
+  [92m✓ PASS[0m  KMeans — forward — output torch.Size([2, 64, 64])
+  [92m✓ PASS[0m  GMM — forward — output torch.Size([2, 64, 64])
+  [92m✓ PASS[0m  SVM — forward — output torch.Size([2, 64, 64])
+
+═══ Loss Function ═══
+  [92m✓ PASS[0m  CrossEntropyDiceLoss — forward+backward — loss=4.3508
+
+═══ Deep Methods ═══
+  (device: cuda)
+  [92m✓ PASS[0m  UNet — instantiation
+  [92m✓ PASS[0m  UNet — inference forward — output torch.Size([2, 19, 64, 64])
+  [92m✓ PASS[0m  UNet — training step — loss=4.1196
+  [92m✓ PASS[0m  UNet — metrics — mIoU=0.0094  acc=0.0516
+  [92m✓ PASS[0m  UNet — checkpoint save — best=95619KB  last=286646KB
+  [92m✓ PASS[0m  UNet — checkpoint reload & verify — outputs match ✓
+  [92m✓ PASS[0m  SegFormer — instantiation
+  [92m✓ PASS[0m  SegFormer — inference forward — output torch.Size([2, 19, 64, 64])
+  [92m✓ PASS[0m  SegFormer — training step — loss=4.2954
+  [92m✓ PASS[0m  SegFormer — metrics — mIoU=0.0044  acc=0.0570
+  [92m✓ PASS[0m  SegFormer — checkpoint save — best=85608KB  last=90279KB
+  [92m✓ PASS[0m  SegFormer — checkpoint reload & verify — outputs match ✓
+  [92m✓ PASS[0m  FPN/MaskRCNN — instantiation
+  [92m✓ PASS[0m  FPN/MaskRCNN — inference forward — output torch.Size([2, 19, 64, 64])
+  [92m✓ PASS[0m  FPN/MaskRCNN — training step — loss=6.1916
+  [92m✓ PASS[0m  FPN/MaskRCNN — metrics — mIoU=0.0063  acc=0.0516
+  [92m✓ PASS[0m  FPN/MaskRCNN — checkpoint save — best=90598KB  last=271614KB
+  [92m✓ PASS[0m  FPN/MaskRCNN — checkpoint reload & verify — outputs match ✓
+
+═══ Training Log / Curves ═══
+  [92m✓ PASS[0m  training_log.json save
+  [92m✓ PASS[0m  training_curves.png save
+
+═══ Data Loader ═══
+  [92m✓ PASS[0m  Cityscapes val loader — 500 samples, img=torch.Size([3, 256, 256]), mask=torch.Size([256, 256])
+
+═══ Mini Training Loop (1 epoch, 1 batch) ═══
+  [92m✓ PASS[0m  Mini train loop (UNet) — loss=4.0976 mIoU=0.0093 acc=0.0514
+
+============================================================
+  RESULTS: 31/31 passed, 0 failed
+============================================================
+
+  All tests passed! 🎉
+>>> Validation complete.
+
+========================================
+>>> Training: unet (cityscapes, encoder=resnet34, epochs=50)
+>>> Started:  Sun Apr  5 07:19:40 PM UTC 2026
+========================================
+2026-04-05 19:19:41,838 [INFO] Loading cityscapes dataset from ./data...
+2026-04-05 19:19:41,846 [INFO] Initializing unet (encoder=resnet34, pretrained=imagenet) for 19 classes...
+2026-04-05 19:19:41,995 [INFO] Starting training on cuda for 50 epochs...
+2026-04-05 19:19:42,097 [INFO] Epoch 1/50
+Training:   0%|          | 0/47 [00:00<?, ?it/s]Training:   2%|▏         | 1/47 [00:04<03:06,  4.05s/it]Training:   4%|▍         | 2/47 [00:07<02:46,  3.71s/it]Training:   6%|▋         | 3/47 [00:11<02:38,  3.61s/it]Training:   9%|▊         | 4/47 [00:14<02:31,  3.53s/it]Training:  11%|█         | 5/47 [00:17<02:27,  3.51s/it]

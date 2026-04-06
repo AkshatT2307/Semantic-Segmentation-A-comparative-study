@@ -1,0 +1,74 @@
+========================================
+  semseg-benchmark — Train All
+  Started: Sun Apr  5 07:16:27 PM UTC 2026
+  Logs:    logs/20260405_191627/
+  Master:  logs/20260405_191627/train_all_output.txt
+========================================
+
+>>> [0/6] Running validation suite...
+============================================================
+  semseg-benchmark — Full Validation Suite
+============================================================
+
+═══ Classical Methods ═══
+  [92m✓ PASS[0m  Otsu Threshold — forward — output torch.Size([2, 64, 64])
+  [92m✓ PASS[0m  Global Threshold — forward — output torch.Size([2, 64, 64])
+  [92m✓ PASS[0m  Graph Cut — forward — output torch.Size([2, 64, 64])
+  [92m✓ PASS[0m  Region (SLIC) — forward — output torch.Size([2, 64, 64])
+  [92m✓ PASS[0m  Edge (Canny) — forward — output torch.Size([2, 64, 64])
+
+═══ ML Methods ═══
+  [92m✓ PASS[0m  KMeans — forward — output torch.Size([2, 64, 64])
+  [92m✓ PASS[0m  GMM — forward — output torch.Size([2, 64, 64])
+  [92m✓ PASS[0m  SVM — forward — output torch.Size([2, 64, 64])
+
+═══ Loss Function ═══
+  [92m✓ PASS[0m  CrossEntropyDiceLoss — forward+backward — loss=4.3626
+
+═══ Deep Methods ═══
+  (device: cuda)
+  [92m✓ PASS[0m  UNet — instantiation
+  [92m✓ PASS[0m  UNet — inference forward — output torch.Size([2, 19, 64, 64])
+  [92m✓ PASS[0m  UNet — training step — loss=4.1111
+  [92m✓ PASS[0m  UNet — metrics — mIoU=0.0096  acc=0.0492
+  [92m✓ PASS[0m  UNet — checkpoint save — best=95619KB  last=286646KB
+  [92m✓ PASS[0m  UNet — checkpoint reload & verify — outputs match ✓
+  [92m✓ PASS[0m  SegFormer — instantiation
+  [92m✓ PASS[0m  SegFormer — inference forward — output torch.Size([2, 19, 64, 64])
+  [92m✓ PASS[0m  SegFormer — training step — loss=4.3384
+  [92m✓ PASS[0m  SegFormer — metrics — mIoU=0.0055  acc=0.0498
+  [92m✓ PASS[0m  SegFormer — checkpoint save — best=85608KB  last=90279KB
+  [92m✓ PASS[0m  SegFormer — checkpoint reload & verify — outputs match ✓
+  [92m✓ PASS[0m  FPN/MaskRCNN — instantiation
+  [92m✓ PASS[0m  FPN/MaskRCNN — inference forward — output torch.Size([2, 19, 64, 64])
+  [92m✓ PASS[0m  FPN/MaskRCNN — training step — loss=7.3150
+  [92m✓ PASS[0m  FPN/MaskRCNN — metrics — mIoU=0.0083  acc=0.0501
+  [92m✓ PASS[0m  FPN/MaskRCNN — checkpoint save — best=90598KB  last=271614KB
+  [92m✓ PASS[0m  FPN/MaskRCNN — checkpoint reload & verify — outputs match ✓
+
+═══ Training Log / Curves ═══
+  [92m✓ PASS[0m  training_log.json save
+  [92m✓ PASS[0m  training_curves.png save
+
+═══ Data Loader ═══
+  [92m✓ PASS[0m  Cityscapes val loader — 500 samples, img=torch.Size([3, 256, 256]), mask=torch.Size([256, 256])
+
+═══ Mini Training Loop (1 epoch, 1 batch) ═══
+  [92m✓ PASS[0m  Mini train loop (UNet) — loss=4.1089 mIoU=0.0057 acc=0.0527
+
+============================================================
+  RESULTS: 31/31 passed, 0 failed
+============================================================
+
+  All tests passed! 🎉
+>>> Validation complete.
+
+========================================
+>>> Training: unet (cityscapes, encoder=resnet34, epochs=100)
+>>> Started:  Sun Apr  5 07:16:32 PM UTC 2026
+========================================
+2026-04-05 19:16:34,033 [INFO] Loading cityscapes dataset from ./data...
+2026-04-05 19:16:34,037 [INFO] Initializing unet (encoder=resnet34, pretrained=imagenet) for 19 classes...
+2026-04-05 19:16:34,170 [INFO] Starting training on cuda for 100 epochs...
+2026-04-05 19:16:34,277 [INFO] Epoch 1/100
+Training:   0%|          | 0/93 [00:00<?, ?it/s]Training:   1%|          | 1/93 [00:02<03:05,  2.02s/it]Training:   2%|▏         | 2/93 [00:03<02:51,  1.88s/it]Training:   3%|▎         | 3/93 [00:05<02:46,  1.85s/it]Training:   4%|▍         | 4/93 [00:07<02:41,  1.82s/it]Training:   5%|▌         | 5/93 [00:09<02:38,  1.80s/it]Training:   6%|▋         | 6/93 [00:10<02:36,  1.80s/it]Training:   8%|▊         | 7/93 [00:12<02:34,  1.79s/it]Training:   9%|▊         | 8/93 [00:14<02:32,  1.80s/it]Training:  10%|▉         | 9/93 [00:16<02:29,  1.78s/it]Training:  11%|█         | 10/93 [00:18<02:28,  1.79s/it]Training:  12%|█▏        | 11/93 [00:19<02:24,  1.76s/it]Training:  13%|█▎        | 12/93 [00:21<02:21,  1.75s/it]Training:  14%|█▍        | 13/93 [00:23<02:19,  1.74s/it]Training:  15%|█▌        | 14/93 [00:24<02:17,  1.74s/it]Training:  16%|█▌        | 15/93 [00:26<02:14,  1.73s/it]Training:  17%|█▋        | 16/93 [00:28<02:12,  1.73s/it]Training:  18%|█▊        | 17/93 [00:30<02:11,  1.73s/it]Training:  19%|█▉        | 18/93 [00:31<02:09,  1.72s/it]Training:  20%|██        | 19/93 [00:33<02:07,  1.72s/it]Training:  22%|██▏       | 20/93 [00:35<02:04,  1.71s/it]Training:  23%|██▎       | 21/93 [00:36<02:03,  1.71s/it]Training:  24%|██▎       | 22/93 [00:38<02:00,  1.69s/it]Training:  25%|██▍       | 23/93 [00:40<01:58,  1.70s/it]Training:  26%|██▌       | 24/93 [00:41<01:56,  1.69s/it]Training:  27%|██▋       | 25/93 [00:43<01:55,  1.70s/it]

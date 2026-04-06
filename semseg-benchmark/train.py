@@ -6,7 +6,7 @@ import json
 # Add methods/deep to sys.path to resolve 'ultralytics' imports
 sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), 'methods/deep'))
 
-import yaml
+
 import torch
 import torch.nn as nn
 from tqdm import tqdm
@@ -38,9 +38,10 @@ def get_args():
     parser.add_argument("--encoder", type=str, default="resnet34", help="Encoder backbone for the model (e.g. resnet34, resnet50, efficientnet-b4). Pretrained ImageNet weights are downloaded automatically.")
     parser.add_argument("--dataset", type=str, default="cityscapes", choices=["coco", "cityscapes"], help="Select Dataset wrapper.")
     parser.add_argument("--data-root", type=str, default="./data", help="Path to dataset root directory (Default: ./data).")
-    parser.add_argument("--config", type=str, default="configs/train_config.yaml", help="Path to config file.")
     parser.add_argument("--batch-size", type=int, default=16, help="Training batch size.")
     parser.add_argument("--epochs", type=int, default=100, help="Number of epochs.")
+    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate.")
+    parser.add_argument("--weight-decay", type=float, default=1e-5, help="L2 regularization (weight decay).")
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu", help="Device to train on.")
     
     return parser.parse_args()
@@ -122,6 +123,17 @@ def train(model, train_loader, val_loader, criterion, optimizer, args, num_class
             "best_miou": best_miou,
         }, os.path.join(weights_dir, "last.pt"))
         
+        # Save periodic checkpoint every 10 epochs
+        if (epoch + 1) % 10 == 0:
+            ckpt_path = os.path.join(weights_dir, f"epoch_{epoch+1}.pt")
+            torch.save({
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "best_miou": best_miou,
+            }, ckpt_path)
+            logging.info(f"Saved periodic checkpoint: {ckpt_path}")
+        
         # Save training log after every epoch (overwrite with full history)
         with open(os.path.join(out_dir, "training_log.json"), "w") as f:
             json.dump(history, f, indent=2)
@@ -157,9 +169,6 @@ def train(model, train_loader, val_loader, criterion, optimizer, args, num_class
 
 def main():
     args = get_args()
-    
-    with open(args.config, "r") as f:
-        config = yaml.safe_load(f)
         
     logging.info(f"Loading {args.dataset} dataset from {args.data_root}...")
     
@@ -188,14 +197,12 @@ def main():
         raise NotImplementedError("SegNet model not yet implemented.")
     else:
         raise ValueError(f"Unknown model: {args.model}")
-        
-    train_cfg = config.get("training", {})
     
     criterion = CrossEntropyDiceLoss(ignore_index=255)
     optimizer = torch.optim.Adam(
         filter(lambda p: p.requires_grad, model.parameters()), 
-        lr=train_cfg.get("lr", 1e-3), 
-        weight_decay=train_cfg.get("l2reg", 1e-5)
+        lr=args.lr, 
+        weight_decay=args.weight_decay
     )
     
     logging.info(f"Starting training on {args.device} for {args.epochs} epochs...")

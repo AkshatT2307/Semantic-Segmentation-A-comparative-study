@@ -1,0 +1,8 @@
+========================================
+  semseg-benchmark — Train All
+  Started: Sun Apr  5 07:17:56 PM UTC 2026
+  Logs:    logs/20260405_191756/
+  Master:  logs/20260405_191756/train_all_output.txt
+========================================
+
+>>> [0/6] Running validation suite...

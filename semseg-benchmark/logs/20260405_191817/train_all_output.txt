@@ -1,0 +1,92 @@
+========================================
+  semseg-benchmark — Train All
+  Started: Sun Apr  5 07:18:17 PM UTC 2026
+  Logs:    logs/20260405_191817/
+  Master:  logs/20260405_191817/train_all_output.txt
+========================================
+
+>>> [0/6] Running validation suite...
+============================================================
+  semseg-benchmark — Full Validation Suite
+============================================================
+
+═══ Classical Methods ═══
+  [92m✓ PASS[0m  Otsu Threshold — forward — output torch.Size([2, 64, 64])
+  [92m✓ PASS[0m  Global Threshold — forward — output torch.Size([2, 64, 64])
+  [92m✓ PASS[0m  Graph Cut — forward — output torch.Size([2, 64, 64])
+  [92m✓ PASS[0m  Region (SLIC) — forward — output torch.Size([2, 64, 64])
+  [92m✓ PASS[0m  Edge (Canny) — forward — output torch.Size([2, 64, 64])
+
+═══ ML Methods ═══
+  [92m✓ PASS[0m  KMeans — forward — output torch.Size([2, 64, 64])
+  [92m✓ PASS[0m  GMM — forward — output torch.Size([2, 64, 64])
+  [92m✓ PASS[0m  SVM — forward — output torch.Size([2, 64, 64])
+
+═══ Loss Function ═══
+  [92m✓ PASS[0m  CrossEntropyDiceLoss — forward+backward — loss=4.3530
+
+═══ Deep Methods ═══
+  (device: cuda)
+  [92m✓ PASS[0m  UNet — instantiation
+  [92m✓ PASS[0m  UNet — inference forward — output torch.Size([2, 19, 64, 64])
+  [92m✓ PASS[0m  UNet — training step — loss=4.1032
+  [92m✓ PASS[0m  UNet — metrics — mIoU=0.0144  acc=0.0524
+  [92m✓ PASS[0m  UNet — checkpoint save — best=95619KB  last=286646KB
+  [92m✓ PASS[0m  UNet — checkpoint reload & verify — outputs match ✓
+  [92m✓ PASS[0m  SegFormer — instantiation
+  [92m✓ PASS[0m  SegFormer — inference forward — output torch.Size([2, 19, 64, 64])
+  [92m✓ PASS[0m  SegFormer — training step — loss=4.2560
+  [92m✓ PASS[0m  SegFormer — metrics — mIoU=0.0103  acc=0.0578
+  [92m✓ PASS[0m  SegFormer — checkpoint save — best=85608KB  last=90279KB
+  [92m✓ PASS[0m  SegFormer — checkpoint reload & verify — outputs match ✓
+  [92m✓ PASS[0m  FPN/MaskRCNN — instantiation
+  [92m✓ PASS[0m  FPN/MaskRCNN — inference forward — output torch.Size([2, 19, 64, 64])
+  [92m✓ PASS[0m  FPN/MaskRCNN — training step — loss=6.2682
+  [92m✓ PASS[0m  FPN/MaskRCNN — metrics — mIoU=0.0054  acc=0.0542
+  [92m✓ PASS[0m  FPN/MaskRCNN — checkpoint save — best=90598KB  last=271614KB
+  [92m✓ PASS[0m  FPN/MaskRCNN — checkpoint reload & verify — outputs match ✓
+
+═══ Training Log / Curves ═══
+  [92m✓ PASS[0m  training_log.json save
+  [92m✓ PASS[0m  training_curves.png save
+
+═══ Data Loader ═══
+  [92m✓ PASS[0m  Cityscapes val loader — 500 samples, img=torch.Size([3, 256, 256]), mask=torch.Size([256, 256])
+
+═══ Mini Training Loop (1 epoch, 1 batch) ═══
+  [92m✓ PASS[0m  Mini train loop (UNet) — loss=4.1405 mIoU=0.0124 acc=0.0537
+
+============================================================
+  RESULTS: 31/31 passed, 0 failed
+============================================================
+
+  All tests passed! 🎉
+>>> Validation complete.
+
+========================================
+>>> Training: unet (cityscapes, encoder=resnet34, epochs=100)
+>>> Started:  Sun Apr  5 07:18:22 PM UTC 2026
+========================================
+2026-04-05 19:18:24,231 [INFO] Loading cityscapes dataset from ./data...
+2026-04-05 19:18:24,235 [INFO] Initializing unet (encoder=resnet34, pretrained=imagenet) for 19 classes...
+2026-04-05 19:18:24,360 [INFO] Starting training on cuda for 100 epochs...
+2026-04-05 19:18:24,452 [INFO] Epoch 1/100
+Training:   0%|          | 0/24 [00:00<?, ?it/s]Training:   0%|          | 0/24 [00:06<?, ?it/s]
+Traceback (most recent call last):
+  File "/opt/watchdog/users/cerussite/ImageSegmentation/SemSeg/semseg-benchmark/train.py", line 212, in <module>
+    main()
+    ~~~~^^
+  File "/opt/watchdog/users/cerussite/ImageSegmentation/SemSeg/semseg-benchmark/train.py", line 209, in main
+    train(model, train_loader, val_loader, criterion, optimizer, args, num_classes)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/watchdog/users/cerussite/ImageSegmentation/SemSeg/semseg-benchmark/train.py", line 76, in train
+    loss = criterion(predict, target)
+  File "/opt/watchdog/users/cerussite/miniconda3/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/watchdog/users/cerussite/miniconda3/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/opt/watchdog/users/cerussite/ImageSegmentation/SemSeg/semseg-benchmark/training/losses.py", line 31, in forward
+    target_one_hot = F.one_hot(target_safe, num_classes=predict.size(1)).permute(0, 3, 1, 2).float()
+                     ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 1.19 GiB. GPU 0 has a total capacity of 15.47 GiB of which 219.06 MiB is free. Including non-PyTorch memory, this process has 15.25 GiB memory in use. Of the allocated memory 13.55 GiB is allocated by PyTorch, and 1.43 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)
