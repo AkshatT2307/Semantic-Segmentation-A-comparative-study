@@ -70,7 +70,7 @@ class CityscapesDataset(Dataset):
             mask_pil = mask_pil.resize((256, 256), resample=Image.NEAREST)
 
             # # Baseline normalization to (C, H, W) in [0.0, 1.0]
-            # img = TF.to_tensor(img_pil) --> not good for image net
+            img = TF.to_tensor(img_pil)
             # Image Net normalization expected by pre-trained resnet-34 encoder
             img = TF.normalize(img, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 

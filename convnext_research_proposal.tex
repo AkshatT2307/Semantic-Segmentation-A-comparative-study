@@ -1,0 +1,173 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{setspace}
+\usepackage{caption}
+
+\title{ConvNeXt-Driven Hybrid Semantic Segmentation:\\
+A Research Proposal for Boundary-Accurate and Context-Aware Parsing}
+\author{Prepared from Repository Evidence in SemSeg and MMSegmentation}
+\date{\today}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+This proposal presents a research plan for a hybrid semantic segmentation architecture that explicitly integrates ConvNeXt-style local representation learning with transformer-based global reasoning and boundary-aware cross-attention decoding. The design is motivated by two observations from current practice: (i) pure convolutional pipelines preserve strong local inductive bias but may under-utilize long-range semantic context, and (ii) pure transformer or MLP-style decoders often struggle at fine boundary recovery, especially under scale variation and clutter. Building on ConvNeXt configurations and performance trends reported for ADE20K, together with an in-repository ConvNeXt block implementation and a hybrid ConvSeg design draft, we propose a unified architecture that allocates convolution where high-resolution detail dominates and self-attention where low-resolution global context is computationally tractable. The proposal defines model design, training protocol, ablations, and risk controls, and targets measurable gains in mIoU and boundary-sensitive metrics on ADE20K and Cityscapes.
+\end{abstract}
+
+\section{Problem Setting and Motivation}
+Semantic segmentation systems must simultaneously optimize:
+\begin{enumerate}[leftmargin=1.4em]
+    \item \textbf{Semantic coherence}: globally consistent labeling across large receptive fields.
+    \item \textbf{Boundary precision}: accurate class transitions at thin structures and object contours.
+    \item \textbf{Computational efficiency}: acceptable memory/latency at high input resolutions.
+\end{enumerate}
+
+Repository evidence shows strong ConvNeXt backbones paired with UPerNet on ADE20K (tiny through xlarge variants), with higher-capacity models improving mIoU but increasing memory and inference cost. This motivates a design that preserves ConvNeXt strengths while introducing selective global reasoning and boundary-aware fusion rather than only scaling backbone size.
+
+\section{Weaknesses of Prior Families}
+\subsection{FCN-style encoders/decoders}
+FCN-style designs are efficient and local-detail-friendly, but global semantic disambiguation is weaker when long-range relations are required.
+
+\subsection{ASPP-based context (e.g., DeepLab variants)}
+Dilated context aggregation improves receptive field, yet may still be limited in explicit content-adaptive global interactions compared with attention.
+
+\subsection{Transformer-heavy segmentation heads}
+Hierarchical transformers improve global context modeling, but boundary quality can degrade when decoder fusion is mostly linear/flat and not explicitly conditioned on edge-sensitive shallow features.
+
+\subsection{ConvNeXt + standard UPerNet}
+ConvNeXt backbones are highly competitive, but default fusion remains broadly generic. The pipeline can benefit from stronger boundary-conditioned semantic refinement instead of only richer backbone depth/width.
+
+\section{Proposed Architecture: ConvNeXt-Driven Hybrid Segmentation}
+\subsection{Design Principle}
+Use \textbf{ConvNeXt blocks at high spatial resolutions} where local texture and contour cues dominate, then use \textbf{efficient self-attention at lower resolutions} where global context is cheaper and more semantically meaningful.
+
+\subsection{Encoder Staging}
+Let input be $X \in \mathbb{R}^{H\times W\times 3}$. We use four hierarchical stages:
+\begin{itemize}[leftmargin=1.4em]
+    \item Stage 1: ConvNeXt blocks at $H/4 \times W/4$.
+    \item Stage 2: ConvNeXt blocks at $H/8 \times W/8$.
+    \item Stage 3: efficient transformer blocks at $H/16 \times W/16$.
+    \item Stage 4: efficient transformer blocks at $H/32 \times W/32$.
+\end{itemize}
+
+The ConvNeXt block follows:
+\begin{equation}
+Y = X + \gamma\,\mathrm{PW}_2\Big(\mathrm{GELU}(\mathrm{PW}_1(\mathrm{LN}(\mathrm{DWConv}_{7\times7}(X))))\Big),
+\end{equation}
+where $\gamma$ is learnable layer scale.
+
+\subsection{Decoder with Boundary-Aware Cross-Attention Gate}
+Given projected multi-scale features $\hat F_1,\hat F_2,\hat F_3,\hat F_4$ at common channel width and spatial grid, we define:
+\begin{align}
+Q &= \hat F_4 W_Q, \\
+K &= [\hat F_1\,\|\,\hat F_2]W_K,\quad
+V = [\hat F_1\,\|\,\hat F_2]W_V, \\
+A &= \mathrm{softmax}\left(\frac{QK^\top}{\sqrt{d}}\right),\quad
+G_{\text{raw}} = AV, \\
+\sigma &= \mathrm{sigmoid}\big(W_g[\hat F_4\,\|\,G_{\text{raw}}]\big), \\
+G &= \sigma\odot G_{\text{raw}} + (1-\sigma)\odot\hat F_4.
+\end{align}
+Final logits are predicted from concatenated $[\hat F_1,\hat F_2,\hat F_3,G]$.
+
+\subsection{Why This Addresses Prior Weaknesses}
+\begin{itemize}[leftmargin=1.4em]
+    \item Restores high-resolution locality with ConvNeXt in early stages.
+    \item Adds explicit global semantic routing with low-resolution attention.
+    \item Replaces blind skip fusion by boundary-aware cross-attention gating.
+    \item Improves compute allocation by placing quadratic attention only where token counts are low.
+\end{itemize}
+
+\section{Training and Evaluation Protocol}
+\subsection{Datasets}
+\begin{itemize}[leftmargin=1.4em]
+    \item \textbf{ADE20K}: 150 semantic classes; variable resolutions.
+    \item \textbf{Cityscapes}: 19 train IDs; high-resolution urban scenes.
+\end{itemize}
+
+\subsection{Data Processing}
+For ADE20K training, follow standard random resize (ratio 0.5--2.0), random crop (512 or 640), random flip, and photometric distortion. For testing, use deterministic resize and optional multi-scale + flip TTA.
+
+\subsection{Optimization Plan}
+Base protocol follows ConvNeXt segmentation configs:
+\begin{itemize}[leftmargin=1.4em]
+    \item Optimizer: AdamW.
+    \item Mixed precision wrapper.
+    \item Stage-wise layer decay constructor.
+    \item Poly learning rate schedule to 160k iterations.
+\end{itemize}
+
+\subsection{Metrics}
+\begin{itemize}[leftmargin=1.4em]
+    \item Primary: mIoU.
+    \item Secondary: class-wise IoU, pixel accuracy.
+    \item Boundary-sensitive: Boundary F-score (or contour F-measure).
+\end{itemize}
+
+\section{Ablation Plan}
+\begin{table}[h]
+\centering
+\caption{Core ablations to isolate contribution sources.}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Ablation ID & Description \\
+\midrule
+A1 & Remove boundary gate; use plain concat decoder \\
+A2 & Replace ConvNeXt stages 1--2 with standard residual blocks \\
+A3 & Replace transformer stages 3--4 with ConvNeXt only \\
+A4 & Vary gate K/V source: $[F_1]$, $[F_2]$, $[F_1\|F_2]$ \\
+A5 & Vary channel width and stage depths (tiny/small/base/large) \\
+A6 & Evaluate with and without TTA \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Expected Outcomes}
+\begin{itemize}[leftmargin=1.4em]
+    \item Better boundary fidelity than purely global-context decoders.
+    \item Better global consistency than purely local ConvNet pipelines.
+    \item Improved quality/efficiency trade-off compared with scaling-only ConvNeXt variants.
+\end{itemize}
+
+\section{Risks and Mitigations}
+\begin{itemize}[leftmargin=1.4em]
+    \item \textbf{Decoder attention overhead}: reduce K/V resolution or channel rank if memory spikes.
+    \item \textbf{Overfitting with large variants}: stronger augmentation and regularization.
+    \item \textbf{Optimization instability}: warmup, gradient clipping, and staged unfreezing.
+\end{itemize}
+
+\section{Milestone Plan}
+\begin{enumerate}[leftmargin=1.4em]
+    \item \textbf{Week 1}: reproducible ConvNeXt/UPerNet baselines on ADE20K and Cityscapes.
+    \item \textbf{Week 2}: hybrid encoder integration and training sanity checks.
+    \item \textbf{Week 3}: boundary-gated decoder + ablation A1/A4.
+    \item \textbf{Week 4}: full ablation suite and reporting.
+\end{enumerate}
+
+\section{Conclusion}
+This proposal defines a principled ConvNeXt-driven hybrid segmentation architecture that directly targets known weaknesses of prior families: weak global semantics in pure ConvNets, weak boundary precision in simple global-context decoders, and high cost of uniformly applied attention. The research plan is grounded in existing repository components and ConvNeXt configuration evidence, and is designed for rigorous, ablation-first validation.
+
+\begin{thebibliography}{9}
+\bibitem{liu2022convnext}
+Z. Liu, H. Mao, C.-Y. Wu, C. Feichtenhofer, T. Darrell, and S. Xie,
+\textit{A ConvNet for the 2020s}, CVPR, 2022.
+
+\bibitem{xiao2021segformer}
+E. Xie, W. Wang, Z. Yu, A. Anandkumar, J. M. Alvarez, and P. Luo,
+\textit{SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers}, NeurIPS, 2021.
+
+\bibitem{chen2017deeplab}
+L.-C. Chen, G. Papandreou, F. Schroff, and H. Adam,
+\textit{Rethinking Atrous Convolution for Semantic Image Segmentation}, arXiv, 2017.
+
+\bibitem{long2015fcn}
+J. Long, E. Shelhamer, and T. Darrell,
+\textit{Fully Convolutional Networks for Semantic Segmentation}, CVPR, 2015.
+\end{thebibliography}
+
+\end{document}

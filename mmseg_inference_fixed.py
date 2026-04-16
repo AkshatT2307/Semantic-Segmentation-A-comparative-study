@@ -36,8 +36,17 @@ from tqdm import tqdm
 warnings.filterwarnings('ignore', message='.*mmcv-lite.*')
 warnings.filterwarnings('ignore', message='.*MultiScaleDeformableAttention.*')
 
+from convseg_net import convseg_t, convseg_s, convseg_b, convseg_l
 from models import build_fcn, build_deeplabv3, build_segformer, inference_model
 from mmseg.utils import get_classes, get_palette
+
+
+CONVSEG_BUILDERS = {
+    'tiny': convseg_t,
+    'small': convseg_s,
+    'base': convseg_b,
+    'large': convseg_l,
+}
 
 
 # ─── Cityscapes labelId → trainId mapping ────────────────────────────────────
@@ -103,6 +112,11 @@ MODELS = {
             'config': os.path.join(MMSEG_DIR, 'configs/deeplabv3/deeplabv3_r50-d8_4xb2-40k_cityscapes-512x1024.py'),
             'checkpoint': os.path.join(SCRIPT_DIR, 'weights/deeplabv3_r50-d8_512x1024_40k_cityscapes_20200605_022449-acadc2f8.pth'),
             'name': 'DeepLabV3-R50-D8'
+        },
+        'convseg': {
+            'config': 'native/convseg_net',
+            'checkpoint': None,
+            'name': 'ConvSeg-Net'
         }
     },
     'ade20k': {
@@ -120,9 +134,63 @@ MODELS = {
             'config': os.path.join(MMSEG_DIR, 'configs/deeplabv3/deeplabv3_r50-d8_4xb4-80k_ade20k-512x512.py'),
             'checkpoint': os.path.join(SCRIPT_DIR, 'weights/deeplabv3_r50-d8_512x512_80k_ade20k_20200614_185028-0bb3f844.pth'),
             'name': 'DeepLabV3-R50-D8'
+        },
+        'convseg': {
+            'config': 'native/convseg_net',
+            'checkpoint': None,
+            'name': 'ConvSeg-Net'
         }
     }
 }
+
+
+def load_convseg_checkpoint(model, checkpoint_path, device):
+    """Load ConvSeg-Net weights from common checkpoint layouts."""
+    model = model.to(device)
+
+    if checkpoint_path is None:
+        print('Warning: ConvSeg-Net checkpoint is not set. Running with random weights.')
+        model.eval()
+        return model
+
+    if not os.path.exists(checkpoint_path):
+        print(f'Warning: ConvSeg-Net checkpoint not found at {checkpoint_path}. Running with random weights.')
+        model.eval()
+        return model
+
+    ckpt = torch.load(checkpoint_path, map_location='cpu')
+    if isinstance(ckpt, dict):
+        if 'state_dict' in ckpt:
+            state_dict = ckpt['state_dict']
+        elif 'model_state_dict' in ckpt:
+            state_dict = ckpt['model_state_dict']
+        else:
+            state_dict = ckpt
+    else:
+        state_dict = ckpt
+
+    if isinstance(state_dict, dict) and len(state_dict) > 0:
+        first_key = next(iter(state_dict.keys()))
+        if first_key.startswith('module.'):
+            state_dict = {k.replace('module.', '', 1): v for k, v in state_dict.items()}
+
+    msg = model.load_state_dict(state_dict, strict=False)
+    if len(msg.missing_keys) > 0:
+        print(f'Warning: ConvSeg missing keys: {len(msg.missing_keys)}')
+    if len(msg.unexpected_keys) > 0:
+        print(f'Warning: ConvSeg unexpected keys: {len(msg.unexpected_keys)}')
+
+    model.eval()
+    return model
+
+
+def build_convseg_model(num_classes, checkpoint=None, device='cuda:0', variant='small'):
+    """Build ConvSeg-Net using the selected variant and optional checkpoint."""
+    if variant not in CONVSEG_BUILDERS:
+        raise ValueError(f'Unknown ConvSeg variant: {variant}')
+
+    model = CONVSEG_BUILDERS[variant](num_classes=num_classes)
+    return load_convseg_checkpoint(model, checkpoint, device)
 
 
 # ─── Evaluation helpers ─────────────────────────────────────────────────────
@@ -260,23 +328,26 @@ def save_class_legend(palette, classes, save_path):
 
 # ─── Main routines ───────────────────────────────────────────────────────────
 
-def evaluate_model(model_key, dataset, data_root, device, vis_count=0, vis_dir=None):
+def evaluate_model(model_key,
+                   dataset,
+                   data_root,
+                   device,
+                   vis_count=0,
+                   vis_dir=None,
+                   convseg_variant='small',
+                   convseg_checkpoint=None):
     """Run full mIoU evaluation on val set."""
-    info = MODELS[dataset][model_key]
+    info = dict(MODELS[dataset][model_key])
+    if model_key == 'convseg':
+        info['name'] = f'ConvSeg-Net-{convseg_variant}'
+        if convseg_checkpoint is not None:
+            info['checkpoint'] = convseg_checkpoint
     print(f'\n{"="*70}')
     print(f'  Evaluating: {info["name"]} on {dataset}')
     print(f'  Config:     {info["config"]}')
     print(f'  Checkpoint: {info["checkpoint"]}')
     print(f'  Device:     {device}')
     print(f'{"="*70}\n')
-
-    # Init model
-    if model_key == 'fcn':
-        model = build_fcn(num_classes, info['checkpoint'], device=device)
-    elif model_key == 'segformer':
-        model = build_segformer(num_classes, info['checkpoint'], device=device)
-    elif model_key == 'deeplabv3':
-        model = build_deeplabv3(num_classes, info['checkpoint'], device=device)
 
     # Dataset specific setup
     if dataset == 'cityscapes':
@@ -291,6 +362,22 @@ def evaluate_model(model_key, dataset, data_root, device, vis_count=0, vis_dir=N
         pairs = collect_ade20k_val_pairs(data_root)
     else:
         raise ValueError(f"Unknown dataset: {dataset}")
+
+    # Init model
+    if model_key == 'fcn':
+        model = build_fcn(num_classes, info['checkpoint'], device=device)
+    elif model_key == 'segformer':
+        model = build_segformer(num_classes, info['checkpoint'], device=device)
+    elif model_key == 'deeplabv3':
+        model = build_deeplabv3(num_classes, info['checkpoint'], device=device)
+    elif model_key == 'convseg':
+        model = build_convseg_model(
+            num_classes=num_classes,
+            checkpoint=info['checkpoint'],
+            device=device,
+            variant=convseg_variant)
+    else:
+        raise ValueError(f"Unknown model key: {model_key}")
 
     print(f'Found {len(pairs)} validation image-label pairs')
     if len(pairs) == 0:
@@ -386,8 +473,19 @@ def evaluate_model(model_key, dataset, data_root, device, vis_count=0, vis_dir=N
     return results
 
 
-def infer_single_image(model_key, dataset, img_path, device, out_dir='outputs'):
+def infer_single_image(model_key,
+                       dataset,
+                       img_path,
+                       device,
+                       out_dir='outputs',
+                       convseg_variant='small',
+                       convseg_checkpoint=None):
     """Run inference on a single image and save visualization."""
+    info = dict(MODELS[dataset][model_key])
+    if model_key == 'convseg':
+        info['name'] = f'ConvSeg-Net-{convseg_variant}'
+        if convseg_checkpoint is not None:
+            info['checkpoint'] = convseg_checkpoint
     palette = CITYSCAPES_PALETTE if dataset == 'cityscapes' else ADE20K_PALETTE
     classes = CITYSCAPES_CLASSES if dataset == 'cityscapes' else ADE20K_CLASSES
     num_classes = len(classes)
@@ -398,6 +496,14 @@ def infer_single_image(model_key, dataset, img_path, device, out_dir='outputs'):
         model = build_segformer(num_classes, info['checkpoint'], device=device)
     elif model_key == 'deeplabv3':
         model = build_deeplabv3(num_classes, info['checkpoint'], device=device)
+    elif model_key == 'convseg':
+        model = build_convseg_model(
+            num_classes=num_classes,
+            checkpoint=info['checkpoint'],
+            device=device,
+            variant=convseg_variant)
+    else:
+        raise ValueError(f"Unknown model key: {model_key}")
 
     print(f'Running inference on: {img_path}')
     pred = inference_model(model, img_path)
@@ -438,7 +544,7 @@ def main():
                         choices=['cityscapes', 'ade20k'],
                         help='Dataset to evaluate on (default: cityscapes)')
     parser.add_argument('--model', type=str, default='all',
-                        choices=['fcn', 'segformer', 'deeplabv3', 'all'],
+                        choices=['fcn', 'segformer', 'deeplabv3', 'convseg', 'all'],
                         help='Model to run (default: all)')
     parser.add_argument('--eval', action='store_true',
                         help='Run full mIoU evaluation on val set')
@@ -454,6 +560,11 @@ def main():
                         help='Directory to save visualizations')
     parser.add_argument('--out-dir', type=str, default='results/mmseg_eval',
                         help='Directory to save evaluation results')
+    parser.add_argument('--convseg-variant', type=str, default='small',
+                        choices=['tiny', 'small', 'base', 'large'],
+                        help='ConvSeg-Net variant (default: small)')
+    parser.add_argument('--convseg-checkpoint', type=str, default=None,
+                        help='Optional checkpoint path for ConvSeg-Net')
     args = parser.parse_args()
 
     if args.device is None:
@@ -476,7 +587,14 @@ def main():
     # Single image mode
     if args.image:
         for m in models_to_run:
-            infer_single_image(m, args.dataset, args.image, args.device, args.out_dir)
+            infer_single_image(
+                m,
+                args.dataset,
+                args.image,
+                args.device,
+                args.out_dir,
+                convseg_variant=args.convseg_variant,
+                convseg_checkpoint=args.convseg_checkpoint)
         return
 
     # Evaluation mode
@@ -485,7 +603,9 @@ def main():
         for m in models_to_run:
             results = evaluate_model(m, args.dataset, args.data_root, args.device,
                                      vis_count=args.vis_count,
-                                     vis_dir=args.vis_dir)
+                                     vis_dir=args.vis_dir,
+                                     convseg_variant=args.convseg_variant,
+                                     convseg_checkpoint=args.convseg_checkpoint)
             if results:
                 all_results[m] = results
 

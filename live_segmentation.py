@@ -26,7 +26,7 @@ warnings.filterwarnings('ignore', message='.*MultiScaleDeformableAttention.*')
 from flask import Flask, render_template_string
 from flask_socketio import SocketIO, emit
 
-from mmseg.apis import init_model, inference_model
+from models import build_fcn, build_deeplabv3, build_segformer, inference_model
 from mmseg.utils import get_classes, get_palette
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
@@ -128,7 +128,13 @@ def load_selected_model(dataset, model_key):
     global model, current_dataset
     info = MODELS[dataset][model_key]
     print(f"Loading {info['name']} on {current_device}...", flush=True)
-    model = init_model(info['config'], info['checkpoint'], device=current_device)
+    num_classes = len(DATASET_INFO[dataset]['classes'])
+    if model_key == 'fcn':
+        model = build_fcn(num_classes, info['checkpoint'], device=current_device)
+    elif model_key == 'segformer':
+        model = build_segformer(num_classes, info['checkpoint'], device=current_device)
+    elif model_key == 'deeplabv3':
+        model = build_deeplabv3(num_classes, info['checkpoint'], device=current_device)
     current_dataset = dataset
     print(f"Model {info['name']} loaded.", flush=True)
 
@@ -589,8 +595,7 @@ def handle_frame(data):
         opacity = float(data.get('opacity', 0.5))
 
         # Run inference
-        result = inference_model(model, frame_bgr)
-        pred = result.pred_sem_seg.data.cpu().numpy().squeeze().astype(np.uint8)
+        pred = inference_model(model, frame_bgr)
 
         h, w = frame_bgr.shape[:2]
         if pred.shape != (h, w):
